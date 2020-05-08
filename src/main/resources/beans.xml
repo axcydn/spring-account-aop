@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:aop="http://www.springframework.org/schema/aop"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop.xsd">
+
+    <!-- 环绕通知需要实现ProceedJoinPoint,该接口有一个方法proceed(),相当于明确调用切入点方法
+     改接口可以作为环绕通知的方法参数，在程序执行时 spring会为我们提供改接口的实现类供我们使用。
+     -->
+    <!-- 创建数据源 -->
+    <bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+        <property name="driverClass" value="com.mysql.jdbc.Driver"/>
+        <property name="user" value="root"/>
+        <property name="password" value="123456789"/>
+        <property name="jdbcUrl" value="jdbc:mysql://192.168.0.240:3306/Account"/>
+    </bean>
+    <!-- 创建增强类所需的 dataSource -->
+    <bean id="connectionUtils" class="com.util.ConnectionUtils">
+        <property name="dataSources" ref="dataSource"/>
+    </bean>
+
+    <!-- 创建查询器 -->
+    <bean id="queryRunner" class="org.apache.commons.dbutils.QueryRunner"/>
+    <!-- 创建事务操作的增强bean -->
+    <bean id="transactionManager" class="com.util.TransactionManager">
+        <property name="connectionUtils" ref="connectionUtils"/>
+    </bean>
+    <!-- 创建aop方法增强 四个通知 -->
+    <aop:config>
+        <aop:pointcut id="accountServiceEnhance" expression="execution(* *.*.*.AccountServiceImpl.*(..))"/>
+        <aop:aspect id="transaction" ref="transactionManager">
+            <aop:before method="beginTransaction" pointcut-ref="accountServiceEnhance"/>
+            <aop:after-returning method="commit" pointcut-ref="accountServiceEnhance"/>
+            <aop:after-throwing method="rollBack" pointcut-ref="accountServiceEnhance"/>
+            <aop:after method="release" pointcut-ref="accountServiceEnhance"/>
+        </aop:aspect>
+    </aop:config>
+    <!-- 环绕通知 -->
+    <aop:config>
+        <aop:pointcut id="accountServiceEnhance" expression="execution(* *.*.*.AccountServiceImpl.*(..))"/>
+        <aop:aspect id="transaction" ref="transactionManager">
+            <aop:around method="aopAround" pointcut-ref="accountServiceEnhance"/>
+        </aop:aspect>
+    </aop:config>
+    <!-- 测试的账户 -->
+    <bean id="account1" class="com.domain.Account">
+        <property name="name" value="gxm"/>
+        <property name="balance" value="100"/>
+        <property name="id" value="17"/>
+    </bean>
+    <bean id="account2" class="com.domain.Account">
+        <property name="name" value="gxm1"/>
+        <property name="id" value="18"/>
+        <property name="balance" value="100"/>
+    </bean>
+    <!-- 创建service bean -->
+    <bean id="accountService" class="com.service.impl.AccountServiceImpl">
+        <property name="accountDao">
+            <bean class="com.dao.impl.AccountDaoImpl">
+                <property name="connectionUtils" ref="connectionUtils"/>
+                <property name="queryRunner" ref="queryRunner"/>
+            </bean>
+        </property>
+    </bean>
+</beans>
